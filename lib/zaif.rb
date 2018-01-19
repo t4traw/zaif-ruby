@@ -19,11 +19,58 @@ module Zaif
             @api_secret = opt[:api_secret] || nil
             @zaif_public_url = "https://api.zaif.jp/api/1/"
             @zaif_trade_url = "https://api.zaif.jp/tapi"
+            @zaif_margin_trade_url = "https://api.zaif.jp/tlapi"
         end
 
         def set_api_key(api_key, api_secret)
             @api_key = api_key
             @api_secret = api_secret
+        end
+
+        # パラメータ 必須 詳細 型
+        # type Yes marginまたはfutures str
+        # group_id Yes/No type=futuresの場合は必須 int
+        # currency_pair Yes (例) btc_jpy str(例 btc_jpy)
+        # action Yes 注文の種類 bid もしくは ask
+        # price Yes 指値注文価格 numerical
+        # amount Yes 数量(例: 0.3) numerical
+        # leverage Yes レバレッジ(小数点第2位まで有効） numerical
+        # limit No リミット注文価格 numerical
+        # stop No ストップ注文価格 numerical
+        def create_margin_position(currency_code, price, amount, action,
+            leverage: 1, limit: nil, stop: nil, counter_currency_code: "jpy")
+          currency_pair = currency_code + "_" + counter_currency_code
+          params = {
+            type: 'margin',
+            currency_pair: currency_pair,
+            action: action,
+            price: price,
+            amount: amount,
+            leverage: leverage,
+          }
+          params.store(:limit, limit) if limit
+          params.store(:stop, stop) if stop
+          json = post_ssl(@zaif_margin_trade_url, "create_position", params)
+          return json
+        end
+
+        # パラメータ 必須 詳細 型
+        # type Yes marginまたはfutures str
+        # group_id Yes/No type=futuresの場合は必須 int
+        # leverage_id Yes レバレッジ注文ID（get_positionsまたはactive_positionsで取得できます） int
+        # price Yes 指値注文価格 numerical
+        # limit No リミット注文価格 numerical
+        # stop No ストップ注文価格 numerical
+        def change_margin_position(leverage_id, price, limit: nil, stop: nil)
+          params = {
+            type: 'margin',
+            leverage_id: leverage_id,
+            price: price,
+          }
+          params.store(:limit, limit) if limit
+          params.store(:stop, stop) if stop
+          json = post_ssl(@zaif_margin_trade_url, "change_position", params)
+          return json
         end
 
         #
@@ -65,7 +112,7 @@ module Zaif
         #
         # Trade API
         #
-        
+
         # Get user infomation.
         # Need api key.
         # @return [Hash] Infomation of user.
@@ -73,11 +120,11 @@ module Zaif
             json = post_ssl(@zaif_trade_url, "get_info", {})
             return json
         end
-        
+
         # Get your trade history.
         # Avalible options: from. count, from_id, end_id, order, since, end, currency_pair
         # Need api key.
-        # @param [Hash] 
+        # @param [Hash]
         def get_my_trades(option = {})
             json = post_ssl(@zaif_trade_url, "trade_history", option)
             # Convert to datetime
@@ -228,6 +275,6 @@ module Zaif
                 sleep(@cool_down_time)
             end
         end
-        
+
     end
 end
